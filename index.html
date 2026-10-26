@@ -4,18 +4,21 @@
 :root{font-family:system-ui,sans-serif;color:#183340;background:#edf2f5}body{max-width:690px;margin:32px auto;padding:0 20px}h1{font-size:32px;letter-spacing:-1px;margin-bottom:6px}h2{font-size:20px}.subtitle{color:#536774;line-height:1.55}.tag{color:#126b67;letter-spacing:2px;font-weight:700;font-size:12px}.card{background:#fff;border:1px solid #d6e0e5;border-radius:18px;padding:23px;margin:18px 0}input,textarea,select{box-sizing:border-box;display:block;width:100%;border:1px solid #bacbd4;border-radius:9px;padding:12px;font:inherit;margin:9px 0}textarea{min-height:100px;overflow-wrap:anywhere}button{border:0;border-radius:9px;background:#126b67;color:white;padding:12px 16px;font:600 14px system-ui;cursor:pointer;margin:5px 5px 5px 0}button.secondary{background:#e8f1f1;color:#174d4a}label{font-weight:600;font-size:14px}.small{font-size:13px;line-height:1.5;color:#536774}#status{white-space:pre-wrap;border-left:4px solid #126b67;padding:12px;overflow-wrap:anywhere}#details{line-height:1.7;font-size:15px}details summary{cursor:pointer;font-weight:600}.hidden{display:none}</style></head><body>
 <div class="tag">FAMILY · PARENT TOOLS</div><h1>A little more time?</h1>
 <p class="subtitle">Review a request and approve a specific amount. The signed decision works once, for one PC and one Hong Kong day.</p>
+<p id="status" role="status" aria-live="polite">Loading the approval page… If this message stays here, open this link in Chrome.</p>
+<noscript><p>This page needs JavaScript. Open this link in Chrome to continue.</p></noscript>
 <div class="card"><strong>Use your own phone.</strong><p class="small">Open this page in Chrome over HTTPS. Your signing key is created and stored encrypted on your phone. Keep your password private and save the encrypted backup. Never create this key on the shared Windows PC.</p></div>
 <div class="card"><h2>1. Unlock your approval key</h2><label for="password">Private parent password</label><input id="password" type="password" autocomplete="off" placeholder="At least 12 characters">
 <button id="unlock">Unlock saved key</button><button id="lock" class="secondary">Lock</button>
-<details><summary>First-time setup or restore</summary><p class="small">Enter a password above, then choose Create parent key. Save the encrypted backup and copy the public pairing code for the Windows timer. The password is not sent anywhere.</p>
+<details id="setup" open><summary>First-time setup or restore</summary><p class="small">Enter a password above, then choose Create parent key. Save the encrypted backup and copy the public pairing code for the Windows timer. The password is not sent anywhere.</p>
 <button id="create">Create parent key</button><button id="backup" class="secondary">Save encrypted backup</button><button id="public" class="secondary">Download public key</button><button id="paircode" class="secondary">Copy pairing code for PC</button>
+<p id="setup-status" role="status" aria-live="polite" style="padding:12px;border:1px solid #bacbd4;border-radius:9px;line-height:1.5">Loading setup…</p>
 <textarea id="pairing" readonly spellcheck="false" placeholder="Public pairing code — safe to send to your Codex chat or paste into Parent setup on the PC."></textarea>
 <label for="restore">Restore encrypted key backup</label><input id="restore" type="file" accept="application/json,.json"></details></div>
 <div class="card"><h2>2. Review Family's request</h2><label for="request">Request code from his email</label><textarea id="request" spellcheck="false" placeholder="RETREQ1.…"></textarea><button id="review" class="secondary">Review request</button><div id="details"></div>
 <label for="minutes">Your decision</label><select id="minutes"><option value="15">Approve 15 minutes</option><option value="30">Approve 30 minutes</option><option value="60">Approve 60 minutes</option><option value="0">Decline</option></select>
 <button id="approve">Create one-use decision</button></div>
 <div class="card"><h2>3. Reply with this code</h2><textarea id="result" readonly spellcheck="false" placeholder="Your signed approval will appear here."></textarea><button id="copy" class="secondary">Copy decision</button><p class="small">Return to Gmail and reply in the original request thread, keeping the original message quoted. Paste the whole code above your reply. The running desktop timer checks that thread every 30 seconds and verifies your signature. An ordinary “yes” reply will not grant time.</p></div>
-<p id="status" role="status">Locked. No private key loaded.</p>
+<p class="small">Parent setup version 0.3.1</p>
 <script>/* Parent-side cryptography. No network calls, analytics or embedded keys. */
 globalThis.RETApproval = (() => {
   const utf8 = new TextEncoder();
@@ -72,24 +75,134 @@ globalThis.RETApproval = (() => {
   }
   return {createVault,unlockVault,request,approve,pairingCode};
 })();
-</script><script>
-let privateKey=null, vault=null, expiry=0;
-const $=id=>document.getElementById(id), status=text=>{$('status').textContent=text;};
-try{vault=JSON.parse(localStorage.getItem('parent-time-vault')||'null');}catch{}
-function remember(){localStorage.setItem('parent-time-vault',JSON.stringify(vault));}
-function download(name,value){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-function lock(){privateKey=null;expiry=0;$('password').value='';status('Locked.');}
-async function run(action){try{if(!crypto.subtle)throw Error('Cryptography unavailable: use HTTPS on your parent device.');await action();}catch(e){status(e.message||'Action failed');}}
-$('create').onclick=()=>run(async()=>{if(vault)throw Error('A key already exists. Restore or use the existing key; this page will not replace it.');const p=$('password').value;vault=await RETApproval.createVault(p);remember();privateKey=await RETApproval.unlockVault(vault,p);expiry=Date.now()+300000;$('password').value='';status('Parent key created. Save an encrypted backup and pair only the public key with the PC. Unlocked for five minutes.');});
-$('unlock').onclick=()=>run(async()=>{if(!vault)throw Error('Create or restore your parent key first.');privateKey=await RETApproval.unlockVault(vault,$('password').value);expiry=Date.now()+300000;$('password').value='';status('Unlocked for five minutes.');});
-$('lock').onclick=lock;
-$('backup').onclick=()=>run(async()=>{if(!vault)throw Error('No key to export');download('Family-parent-encrypted-backup.json',vault);});
-$('public').onclick=()=>run(async()=>{if(!vault)throw Error('No key to export');download('Family-parent-public-key.json',vault.public_key);});
-$('paircode').onclick=()=>run(async()=>{if(!vault)throw Error('Create or restore your parent key first.');const code=RETApproval.pairingCode(vault);$('pairing').value=code;try{await navigator.clipboard.writeText(code);status('Public pairing code copied. Paste into the desktop Parent setup or your Codex chat.');}catch{status('Select and copy the public pairing code shown above.');}});
-$('restore').onchange=()=>run(async()=>{if(vault)throw Error('A key is already saved; restore is disabled to avoid accidental replacement.');const file=$('restore').files[0];if(!file||file.size>12000)throw Error('Invalid backup file');const candidate=JSON.parse(await file.text());const unlocked=await RETApproval.unlockVault(candidate,$('password').value);vault=candidate;remember();privateKey=unlocked;expiry=Date.now()+300000;$('password').value='';status('Key restored and unlocked.');});
-$('review').onclick=()=>run(async()=>{const r=RETApproval.request($('request').value);$('details').textContent=`Requested: ${r.requested_minutes} minutes. Day: ${r.day} (Hong Kong). PC ID: ${r.device_id}. Expires: ${new Date(r.expires_at*1000).toLocaleString()}.`;$('minutes').value=String(r.requested_minutes);});
-$('approve').onclick=()=>run(async()=>{if(!privateKey||Date.now()>expiry){lock();throw Error('Unlock your parent key first.');}const code=await RETApproval.approve($('request').value,Number($('minutes').value),privateKey);$('result').value=code;status('Decision signed. Reply with the whole code; no email has been sent by this page.');});
-$('copy').onclick=()=>run(async()=>{if(!$('result').value)throw Error('Create a decision first.');await navigator.clipboard.writeText($('result').value);status('Decision copied.');});
-setInterval(()=>{if(privateKey&&Date.now()>expiry)lock();},1000);
-try { const code=new URLSearchParams(location.hash.slice(1)).get('request');if(code){RETApproval.request(code);$('request').value=code;$('review').click();history.replaceState(null,'',location.pathname+location.search);} } catch {status('The link request is invalid or expired. Use the latest request email.');}
+</script><script>/* Parent setup UI. Existing encrypted keys are preserved; nothing is uploaded. */
+(() => {
+  const $ = id => document.getElementById(id);
+  const storageName = 'parent-time-vault';
+  let privateKey = null, vault = null, expiry = 0, busy = false, saved = false, storageProblem = '';
+  const buttons = ['create','unlock','lock','backup','public','paircode','review','approve','copy'];
+  function message(text, error = false, setup = true, reveal = true) {
+    for (const id of setup ? ['status','setup-status'] : ['status']) {
+      $(id).textContent = text;
+      $(id).style.color = error ? '#9c2525' : '#174d4a';
+      $(id).setAttribute('role', error ? 'alert' : 'status');
+    }
+    if (reveal) (setup ? $('setup-status') : $('status')).scrollIntoView({block:'nearest'});
+  }
+  function controls() {
+    for (const id of buttons) $(id).disabled = busy;
+    $('create').disabled = busy || !!vault || !!storageProblem;
+    $('create').textContent = vault ? 'Parent key already created' : 'Create parent key';
+    $('unlock').disabled = busy || !vault;
+    $('backup').disabled = busy || !vault;
+    $('paircode').disabled = busy || !saved;
+    $('public').disabled = busy || !saved;
+    $('restore').disabled = busy || !!vault || !!storageProblem;
+    if (saved) $('pairing').value = RETApproval.pairingCode(vault);
+  }
+  function cryptoReady() {
+    if (!globalThis.crypto?.subtle) throw Error('Key creation is unavailable in this browser. Open this HTTPS link in Chrome on your phone.');
+  }
+  function save(candidate) {
+    const encoded = JSON.stringify(candidate);
+    const existing = localStorage.getItem(storageName);
+    if (existing && existing !== encoded) throw Error('A key was saved in another tab. It has not been replaced. Reload this page and use that existing key.');
+    vault = candidate;
+    try {
+      localStorage.setItem(storageName, encoded);
+      saved = localStorage.getItem(storageName) === encoded;
+      if (!saved) throw Error('Storage did not retain the key');
+    } catch {
+      saved = false;
+      throw Error('Your key was created, but this browser could not save it. Tap Save encrypted backup before leaving this page. Then open normal Chrome and restore that backup; do not create another key.');
+    }
+  }
+  function download(name, value) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)], {type:'application/json'}));
+    a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function lock() { privateKey=null; expiry=0; $('password').value=''; message('Locked. Your saved key is still available; enter its password to unlock.'); }
+  async function run(action, progress, setup = true) {
+    if (busy) return;
+    busy = true; controls();
+    if (setup) $('password').blur();
+    message(progress, false, setup);
+    try { await action(); }
+    catch (error) { message(error?.name === 'OperationError' ? 'The key could not be unlocked. Check the private password you used when creating it.' : error.message || 'This action failed. Please tell the chat the message shown here.', true, setup); }
+    finally { busy=false; controls(); }
+  }
+  $('create').onclick = () => run(async () => {
+    if (vault || storageProblem) throw Error('An existing key cannot be replaced. Use the saved key or its backup.');
+    const password = $('password').value;
+    if (password.length < 12) throw Error('Enter a private parent password of at least 12 characters in the password box above, then tap Create parent key.');
+    cryptoReady();
+    const candidate = await RETApproval.createVault(password);
+    save(candidate);
+    privateKey = await RETApproval.unlockVault(vault,password); expiry=Date.now()+300000; $('password').value='';
+    message('Parent key created and saved on this phone. Next: Save encrypted backup, then Copy pairing code for PC. Unlocked for five minutes.');
+  }, 'Creating your parent key… Please wait.');
+  $('unlock').onclick = () => run(async () => {
+    cryptoReady(); if (!vault) throw Error('Create or restore your parent key first.');
+    privateKey=await RETApproval.unlockVault(vault,$('password').value); expiry=Date.now()+300000; $('password').value='';
+    message('Key unlocked for five minutes. Your existing key has been preserved.');
+  }, 'Unlocking your saved key…');
+  $('lock').onclick = lock;
+  $('backup').onclick = () => run(async () => {
+    if (!vault) throw Error('Create or restore your parent key first.');
+    download('Family-parent-encrypted-backup.json',vault);
+    message(saved ? 'Backup download requested. Check Chrome Downloads for the encrypted backup, then tap Copy pairing code for PC.' : 'Backup download requested. Check Chrome Downloads before leaving, then restore that backup in normal Chrome.');
+  }, 'Preparing encrypted backup…');
+  $('public').onclick = () => run(async () => {
+    if (!saved) throw Error('Save your key on this phone before pairing.');
+    download('Family-parent-public-key.json',vault.public_key); message('Public-key download requested. This contains no private key.');
+  }, 'Preparing public key…');
+  $('paircode').onclick = () => run(async () => {
+    if (!saved) throw Error('Save or restore your key on this phone before pairing.');
+    const code=RETApproval.pairingCode(vault); $('pairing').value=code;
+    try { await navigator.clipboard.writeText(code); message('Public pairing code copied. Return to your Codex chat and paste it there.'); }
+    catch { message('Select and copy the RETPUB1 public pairing code shown below, then paste it in your Codex chat.'); }
+  }, 'Copying public pairing code…');
+  $('restore').onchange = () => run(async () => {
+    if (vault || storageProblem) throw Error('An existing key cannot be replaced.');
+    cryptoReady(); const file=$('restore').files[0];
+    if (!file || file.size>12000) throw Error('Choose your encrypted key backup file.');
+    const candidate=JSON.parse(await file.text());
+    const unlocked=await RETApproval.unlockVault(candidate,$('password').value);
+    save(candidate); privateKey=unlocked; expiry=Date.now()+300000; $('password').value='';
+    message('Your original key was restored and saved. You can copy its public pairing code.');
+  }, 'Restoring your existing key…');
+  function review() {
+    const r=RETApproval.request($('request').value);
+    $('details').textContent=`Requested: ${r.requested_minutes} minutes. Day: ${r.day} (Hong Kong). PC ID: ${r.device_id}. Expires: ${new Date(r.expires_at*1000).toLocaleString()}.`;
+    $('minutes').value=String(r.requested_minutes);
+  }
+  $('review').onclick = () => run(async () => {review();message('Request checked. Unlock your key, choose the amount and create a decision.',false,false);},'Checking request…',false);
+  $('approve').onclick = () => run(async () => {
+    cryptoReady(); if (!privateKey || Date.now()>expiry) {lock();throw Error('Unlock your saved parent key first.');}
+    $('result').value=await RETApproval.approve($('request').value,Number($('minutes').value),privateKey);
+    message('Decision signed. Copy it and reply in the original email thread; this page has not sent an email.',false,false);
+  }, 'Signing this decision…',false);
+  $('copy').onclick = () => run(async () => {
+    if (!$('result').value) throw Error('Create a decision first.');
+    try {await navigator.clipboard.writeText($('result').value);message('Decision copied. Reply in the original email thread.',false,false);}
+    catch {message('Select and copy the signed decision shown above, then reply in the original email thread.',false,false);}
+  },'Copying decision…',false);
+  try {
+    const raw=localStorage.getItem(storageName);
+    if (raw) {
+      const candidate=JSON.parse(raw);
+      if (candidate?.v !== 1 || !candidate.salt || !candidate.iv || !candidate.ciphertext) throw Error('Unreadable key');
+      RETApproval.pairingCode(candidate); vault=candidate; saved=true;
+    }
+  } catch { storageProblem='This browser cannot read its saved key storage. Existing data has not been changed. Open this link in normal Chrome; if it still fails, tell the chat this message. Do not clear browser data.'; }
+  controls();
+  message(storageProblem || (saved ? 'A parent key is already saved on this phone. Save its encrypted backup if needed, then tap Copy pairing code for PC.' : 'Ready for setup. Enter a private password of at least 12 characters above, then tap Create parent key.'),!!storageProblem,true,false);
+  setInterval(() => {if(privateKey && Date.now()>expiry)lock();},1000);
+  try {
+    const code=new URLSearchParams(location.hash.slice(1)).get('request');
+    if (code) { RETApproval.request(code); $('request').value=code; review(); history.replaceState(null,'',location.pathname+location.search); }
+  } catch { message('The link request is invalid or expired. Use the latest request email.',true,false,false); }
+})();
 </script></body></html>
