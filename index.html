@@ -1,0 +1,95 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; form-action 'none'; base-uri 'none'">
+<title>Family · Parent approvals</title><style>
+:root{font-family:system-ui,sans-serif;color:#183340;background:#edf2f5}body{max-width:690px;margin:32px auto;padding:0 20px}h1{font-size:32px;letter-spacing:-1px;margin-bottom:6px}h2{font-size:20px}.subtitle{color:#536774;line-height:1.55}.tag{color:#126b67;letter-spacing:2px;font-weight:700;font-size:12px}.card{background:#fff;border:1px solid #d6e0e5;border-radius:18px;padding:23px;margin:18px 0}input,textarea,select{box-sizing:border-box;display:block;width:100%;border:1px solid #bacbd4;border-radius:9px;padding:12px;font:inherit;margin:9px 0}textarea{min-height:100px;overflow-wrap:anywhere}button{border:0;border-radius:9px;background:#126b67;color:white;padding:12px 16px;font:600 14px system-ui;cursor:pointer;margin:5px 5px 5px 0}button.secondary{background:#e8f1f1;color:#174d4a}label{font-weight:600;font-size:14px}.small{font-size:13px;line-height:1.5;color:#536774}#status{white-space:pre-wrap;border-left:4px solid #126b67;padding:12px;overflow-wrap:anywhere}#details{line-height:1.7;font-size:15px}details summary{cursor:pointer;font-weight:600}.hidden{display:none}</style></head><body>
+<div class="tag">FAMILY · PARENT TOOLS</div><h1>A little more time?</h1>
+<p class="subtitle">Review a request and approve a specific amount. The signed decision works once, for one PC and one Hong Kong day.</p>
+<div class="card"><strong>Use your Android phone.</strong><p class="small">Your signing key and password stay here. Use Chrome over HTTPS or open this downloaded file if Chrome supports it. If cryptography is unavailable, stop and tell Xavier's Codex chat. Never create this key on the shared Windows PC.</p></div>
+<div class="card"><h2>1. Unlock your approval key</h2><label for="password">Private parent password</label><input id="password" type="password" autocomplete="off" placeholder="At least 12 characters">
+<button id="unlock">Unlock saved key</button><button id="lock" class="secondary">Lock</button>
+<details><summary>First-time setup or restore</summary><p class="small">Create the key only on your separate parent device. Save its encrypted backup. Send only the public-key file to the Windows timer. The password is not sent anywhere.</p>
+<button id="create">Create parent key</button><button id="backup" class="secondary">Save encrypted backup</button><button id="public" class="secondary">Download public key</button><button id="paircode" class="secondary">Copy pairing code for PC</button>
+<textarea id="pairing" readonly spellcheck="false" placeholder="Public pairing code — safe to send to your Codex chat or paste into Parent setup on the PC."></textarea>
+<label for="restore">Restore encrypted key backup</label><input id="restore" type="file" accept="application/json,.json"></details></div>
+<div class="card"><h2>2. Review Family's request</h2><label for="request">Request code from his email</label><textarea id="request" spellcheck="false" placeholder="RETREQ1.…"></textarea><button id="review" class="secondary">Review request</button><div id="details"></div>
+<label for="minutes">Your decision</label><select id="minutes"><option value="15">Approve 15 minutes</option><option value="30">Approve 30 minutes</option><option value="60">Approve 60 minutes</option><option value="0">Decline</option></select>
+<button id="approve">Create one-use decision</button></div>
+<div class="card"><h2>3. Reply with this code</h2><textarea id="result" readonly spellcheck="false" placeholder="Your signed approval will appear here."></textarea><button id="copy" class="secondary">Copy decision</button><p class="small">Return to Gmail and reply in the original request thread, keeping the original message quoted. Paste the whole code above your reply. The running desktop timer checks that thread every 30 seconds and verifies your signature. An ordinary “yes” reply will not grant time.</p></div>
+<p id="status" role="status">Locked. No private key loaded.</p>
+<script>/* Parent-side cryptography. No network calls, analytics or embedded keys. */
+globalThis.RETApproval = (() => {
+  const utf8 = new TextEncoder();
+  const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  function unb64(value) {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > 20000) throw Error('Invalid encoded data');
+    return Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/') + '='.repeat((4-value.length%4)%4)), c=>c.charCodeAt(0));
+  }
+  async function passwordKey(password, salt) {
+    if (typeof password !== 'string' || password.length < 12) throw Error('Use a private parent password of at least 12 characters.');
+    const key = await crypto.subtle.importKey('raw',utf8.encode(password),'PBKDF2',false,['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt,iterations:310000},key,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+  }
+  async function createVault(password) {
+    const pair = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+    const priv = await crypto.subtle.exportKey('jwk',pair.privateKey);
+    const pub = await crypto.subtle.exportKey('jwk',pair.publicKey);
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await passwordKey(password,salt);
+    const encrypted = await crypto.subtle.encrypt({name:'AES-GCM',iv},key,utf8.encode(JSON.stringify(priv)));
+    return {v:1,salt:b64(salt),iv:b64(iv),ciphertext:b64(encrypted),public_key:{kty:pub.kty,crv:pub.crv,x:pub.x,y:pub.y}};
+  }
+  async function unlockVault(vault,password) {
+    if (vault.v !== 1) throw Error('Unsupported key backup');
+    const key = await passwordKey(password,unb64(vault.salt));
+    const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(vault.iv)},key,unb64(vault.ciphertext));
+    const jwk = JSON.parse(new TextDecoder().decode(plain));
+    if (jwk.x !== vault.public_key.x || jwk.y !== vault.public_key.y || jwk.crv !== 'P-256') throw Error('Key backup mismatch');
+    return crypto.subtle.importKey('jwk',jwk,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
+  }
+  function request(code, now=Date.now()/1000) {
+    const parts = code.trim().split('.');
+    if (parts.length !== 2 || parts[0] !== 'RETREQ1') throw Error('Paste a RETREQ1 request code');
+    const r = JSON.parse(new TextDecoder().decode(unb64(parts[1])));
+    if (JSON.stringify(Object.keys(r).sort()) !== JSON.stringify(['v','request_id','device_id','day','requested_minutes','expires_at'].sort()) || r.v !== 1) throw Error('Invalid request fields');
+    if (!/^[a-f0-9]{32}$/.test(r.request_id) || !/^[a-f0-9]{32}$/.test(r.device_id)) throw Error('Invalid request identity');
+    const day = new Date((now+8*3600)*1000).toISOString().slice(0,10);
+    if (r.day !== day || !Number.isInteger(r.expires_at) || r.expires_at <= now || r.expires_at > now+7205) throw Error('Request expired, clock incorrect, or wrong Hong Kong day');
+    if (![15,30,60].includes(r.requested_minutes)) throw Error('Invalid requested amount');
+    return r;
+  }
+  async function approve(code, minutes, key, now=Date.now()/1000) {
+    const r = request(code,now);
+    if (![0,15,30,60].includes(minutes)) throw Error('Choose decline, 15, 30 or 60 minutes');
+    const payload = {v:1,request_id:r.request_id,device_id:r.device_id,day:r.day,minutes,expires_at:r.expires_at};
+    const bytes = utf8.encode(JSON.stringify(payload));
+    const signature = await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,bytes);
+    return 'RETAPP1.' + b64(bytes) + '.' + b64(signature);
+  }
+  function pairingCode(vault) {
+    const p=vault.public_key;
+    if(!p || p.kty!=='EC' || p.crv!=='P-256' || 'd' in p)throw Error('Only a public key can be paired');
+    return 'RETPUB1.'+b64(utf8.encode(JSON.stringify({kty:p.kty,crv:p.crv,x:p.x,y:p.y})));
+  }
+  return {createVault,unlockVault,request,approve,pairingCode};
+})();
+</script><script>
+let privateKey=null, vault=null, expiry=0;
+const $=id=>document.getElementById(id), status=text=>{$('status').textContent=text;};
+try{vault=JSON.parse(localStorage.getItem('parent-time-vault')||'null');}catch{}
+function remember(){localStorage.setItem('parent-time-vault',JSON.stringify(vault));}
+function download(name,value){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function lock(){privateKey=null;expiry=0;$('password').value='';status('Locked.');}
+async function run(action){try{if(!crypto.subtle)throw Error('Cryptography unavailable: use HTTPS on your parent device.');await action();}catch(e){status(e.message||'Action failed');}}
+$('create').onclick=()=>run(async()=>{if(vault)throw Error('A key already exists. Restore or use the existing key; this page will not replace it.');const p=$('password').value;vault=await RETApproval.createVault(p);remember();privateKey=await RETApproval.unlockVault(vault,p);expiry=Date.now()+300000;$('password').value='';status('Parent key created. Save an encrypted backup and pair only the public key with the PC. Unlocked for five minutes.');});
+$('unlock').onclick=()=>run(async()=>{if(!vault)throw Error('Create or restore your parent key first.');privateKey=await RETApproval.unlockVault(vault,$('password').value);expiry=Date.now()+300000;$('password').value='';status('Unlocked for five minutes.');});
+$('lock').onclick=lock;
+$('backup').onclick=()=>run(async()=>{if(!vault)throw Error('No key to export');download('Family-parent-encrypted-backup.json',vault);});
+$('public').onclick=()=>run(async()=>{if(!vault)throw Error('No key to export');download('Family-parent-public-key.json',vault.public_key);});
+$('paircode').onclick=()=>run(async()=>{if(!vault)throw Error('Create or restore your parent key first.');const code=RETApproval.pairingCode(vault);$('pairing').value=code;try{await navigator.clipboard.writeText(code);status('Public pairing code copied. Paste into the desktop Parent setup or your Codex chat.');}catch{status('Select and copy the public pairing code shown above.');}});
+$('restore').onchange=()=>run(async()=>{if(vault)throw Error('A key is already saved; restore is disabled to avoid accidental replacement.');const file=$('restore').files[0];if(!file||file.size>12000)throw Error('Invalid backup file');const candidate=JSON.parse(await file.text());const unlocked=await RETApproval.unlockVault(candidate,$('password').value);vault=candidate;remember();privateKey=unlocked;expiry=Date.now()+300000;$('password').value='';status('Key restored and unlocked.');});
+$('review').onclick=()=>run(async()=>{const r=RETApproval.request($('request').value);$('details').textContent=`Requested: ${r.requested_minutes} minutes. Day: ${r.day} (Hong Kong). PC ID: ${r.device_id}. Expires: ${new Date(r.expires_at*1000).toLocaleString()}.`;$('minutes').value=String(r.requested_minutes);});
+$('approve').onclick=()=>run(async()=>{if(!privateKey||Date.now()>expiry){lock();throw Error('Unlock your parent key first.');}const code=await RETApproval.approve($('request').value,Number($('minutes').value),privateKey);$('result').value=code;status('Decision signed. Reply with the whole code; no email has been sent by this page.');});
+$('copy').onclick=()=>run(async()=>{if(!$('result').value)throw Error('Create a decision first.');await navigator.clipboard.writeText($('result').value);status('Decision copied.');});
+setInterval(()=>{if(privateKey&&Date.now()>expiry)lock();},1000);
+try { const code=new URLSearchParams(location.hash.slice(1)).get('request');if(code){RETApproval.request(code);$('request').value=code;$('review').click();history.replaceState(null,'',location.pathname+location.search);} } catch {status('The link request is invalid or expired. Use the latest request email.');}
+</script></body></html>
