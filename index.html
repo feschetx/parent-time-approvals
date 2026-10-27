@@ -7,7 +7,8 @@
 <p id="status" role="status" aria-live="polite">Loading the approval page… If this message stays here, open this link in Chrome.</p>
 <noscript><p>This page needs JavaScript. Open this link in Chrome to continue.</p></noscript>
 <div class="card"><strong>Use your own phone.</strong><p class="small">Open this page in Chrome over HTTPS. Your signing key is created and stored encrypted on your phone. Keep your password private and save the encrypted backup. Never create this key on the shared Windows PC.</p></div>
-<div class="card"><h2>1. Unlock your approval key</h2><label for="password">Private parent password</label><input id="password" type="password" autocomplete="off" placeholder="At least 12 characters">
+<div class="card"><h2>1. Unlock your approval key</h2><label for="password">Private parent password</label><input id="password" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="At least 12 characters">
+<div><button id="password-visibility" type="button" class="secondary" aria-controls="password" aria-pressed="false">Show password</button></div>
 <button id="unlock">Unlock saved key</button><button id="lock" class="secondary">Lock</button>
 <details id="setup" open><summary>First-time setup or restore</summary><p class="small">Enter a password above, then choose Create parent key. Save the encrypted backup and copy the public pairing code for the Windows timer. The password is not sent anywhere.</p>
 <button id="create">Create parent key</button><button id="backup" class="secondary">Save encrypted backup</button><button id="public" class="secondary">Download public key</button><button id="paircode" class="secondary">Copy pairing code for PC</button>
@@ -18,7 +19,7 @@
 <label for="minutes">Your decision</label><select id="minutes"><option value="15">Approve 15 minutes</option><option value="30">Approve 30 minutes</option><option value="60">Approve 60 minutes</option><option value="0">Decline</option></select>
 <button id="approve">Create one-use decision</button></div>
 <div class="card"><h2>3. Reply with this code</h2><textarea id="result" readonly spellcheck="false" placeholder="Your signed approval will appear here."></textarea><button id="copy" class="secondary">Copy decision</button><p class="small">Return to Gmail and reply in the original request thread, keeping the original message quoted. Paste the whole code above your reply. The running desktop timer checks that thread every 30 seconds and verifies your signature. An ordinary “yes” reply will not grant time.</p></div>
-<p class="small">Parent setup version 0.3.1</p>
+<p class="small">Parent setup version 0.3.2</p>
 <script>/* Parent-side cryptography. No network calls, analytics or embedded keys. */
 globalThis.RETApproval = (() => {
   const utf8 = new TextEncoder();
@@ -80,7 +81,15 @@ globalThis.RETApproval = (() => {
   const $ = id => document.getElementById(id);
   const storageName = 'parent-time-vault';
   let privateKey = null, vault = null, expiry = 0, busy = false, saved = false, storageProblem = '';
-  const buttons = ['create','unlock','lock','backup','public','paircode','review','approve','copy'];
+  const buttons = ['create','unlock','lock','backup','public','paircode','review','approve','copy','password-visibility'];
+  function passwordVisible(visible) {
+    $('password').type = visible ? 'text' : 'password';
+    $('password-visibility').textContent = visible ? 'Hide password' : 'Show password';
+    $('password-visibility').setAttribute('aria-pressed', String(visible));
+  }
+  function clearPassword() { $('password').value=''; passwordVisible(false); }
+  $('password-visibility').onclick = () => passwordVisible($('password').type === 'password');
+  passwordVisible(false);
   function message(text, error = false, setup = true, reveal = true) {
     for (const id of setup ? ['status','setup-status'] : ['status']) {
       $(id).textContent = text;
@@ -123,7 +132,7 @@ globalThis.RETApproval = (() => {
     a.download = name; document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  function lock() { privateKey=null; expiry=0; $('password').value=''; message('Locked. Your saved key is still available; enter its password to unlock.'); }
+  function lock() { privateKey=null; expiry=0; clearPassword(); message('Locked. Your saved key is still available; enter its password to unlock.'); }
   async function run(action, progress, setup = true) {
     if (busy) return;
     busy = true; controls();
@@ -140,12 +149,12 @@ globalThis.RETApproval = (() => {
     cryptoReady();
     const candidate = await RETApproval.createVault(password);
     save(candidate);
-    privateKey = await RETApproval.unlockVault(vault,password); expiry=Date.now()+300000; $('password').value='';
+    privateKey = await RETApproval.unlockVault(vault,password); expiry=Date.now()+300000; clearPassword();
     message('Parent key created and saved on this phone. Next: Save encrypted backup, then Copy pairing code for PC. Unlocked for five minutes.');
   }, 'Creating your parent key… Please wait.');
   $('unlock').onclick = () => run(async () => {
     cryptoReady(); if (!vault) throw Error('Create or restore your parent key first.');
-    privateKey=await RETApproval.unlockVault(vault,$('password').value); expiry=Date.now()+300000; $('password').value='';
+    privateKey=await RETApproval.unlockVault(vault,$('password').value); expiry=Date.now()+300000; clearPassword();
     message('Key unlocked for five minutes. Your existing key has been preserved.');
   }, 'Unlocking your saved key…');
   $('lock').onclick = lock;
@@ -170,7 +179,7 @@ globalThis.RETApproval = (() => {
     if (!file || file.size>12000) throw Error('Choose your encrypted key backup file.');
     const candidate=JSON.parse(await file.text());
     const unlocked=await RETApproval.unlockVault(candidate,$('password').value);
-    save(candidate); privateKey=unlocked; expiry=Date.now()+300000; $('password').value='';
+    save(candidate); privateKey=unlocked; expiry=Date.now()+300000; clearPassword();
     message('Your original key was restored and saved. You can copy its public pairing code.');
   }, 'Restoring your existing key…');
   function review() {
