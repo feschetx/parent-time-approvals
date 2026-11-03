@@ -1,0 +1,33 @@
+name: Inspect native Screen Time action schema
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - name: Read public system action metadata only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          records=[]
+          root=Path('/System/Library/ExtensionKit/Extensions')
+          for bundle in root.iterdir():
+              if 'IntelligencePlatform' not in bundle.name: continue
+              for f in bundle.rglob('extract.actionsdata'):
+                  if f.stat().st_size>5000000: continue
+                  try: d=json.loads(f.read_bytes())
+                  except Exception: continue
+                  if 'CalculateAppUsageIntent' in json.dumps(d):
+                      records.append({'system_path':str(f),'metadata':d})
+          Path('native-screen-time-schema.json').write_text(json.dumps(records,indent=2))
+          print('Matching public metadata files:',len(records))
+          if not records: raise SystemExit('Native Screen Time action metadata not found')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-screen-time-schema
+          path: native-screen-time-schema.json
+          retention-days: 2
