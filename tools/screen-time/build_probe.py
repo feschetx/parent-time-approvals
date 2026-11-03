@@ -54,7 +54,10 @@ def build():
     attachment = next(iter(params["attachmentsByRange"].values()))
     params["attachmentsByRange"] = {"{%d, 1}" % params["string"].index("\ufffc"): attachment}
     add("is.workflow.actions.setclipboard", WFInput=output(report, "Text"), WFLocalOnly=True)
-    add("is.workflow.actions.showresult", Text=output(report, "Text"))
+    # Show Result is a text field, not a content-item field. A bare token
+    # attachment imports as an unbound "Content" placeholder on iOS 27.
+    add("is.workflow.actions.showresult", Text=text("\ufffc", {
+        "{0, 1}": {"OutputUUID": report, "Type": "ActionOutput", "OutputName": "Text"}}))
     workflow = {
         "WFWorkflowName": "Screen Time Setup Check", "WFWorkflowClientVersion": "4046.0.2.2",
         "WFWorkflowMinimumClientVersion": 900, "WFWorkflowMinimumClientVersionString": "900",
