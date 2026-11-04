@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Daily Screen Time setup</title>
+<style>body{font:18px/1.5 system-ui,sans-serif;max-width:38rem;margin:2rem auto;padding:0 1.1rem;color:#12343b;background:#f2f8f8}section{background:white;border-radius:16px;padding:1.3rem;margin:1rem 0}button,a.button{display:block;padding:1rem;border:0;border-radius:12px;background:#075d68;color:white;text-decoration:none;font:inherit;text-align:center;margin:.8rem 0;width:100%;box-sizing:border-box}button:disabled{background:#647579}small{display:block;color:#425d64}h1{line-height:1.2}#status{min-height:2em}code{overflow-wrap:anywhere}</style>
+<h1>Daily Screen Time</h1>
+<p>One-time setup on the monitored iPhone. After setup, no daily photos or copying are needed.</p>
+<section><h2>1. Add the shortcut</h2>
+<p>This reads <strong>yesterday’s app names and Apple-reported durations</strong> from the phone you select, then sends them over HTTPS to your private family collector for the monitoring report.</p>
+<button id="copy" disabled>Copy private setup code</button><p id="status" role="status" aria-live="polite">Open the private QR code provided on your desktop to enable setup.</p>
+<a class="button" href="Daily-Screen-Time.shortcut" download>Download Daily Screen Time</a>
+<ol><li>Tap <strong>Copy private setup code</strong> above.</li><li>Download the shortcut. Open it from Safari Downloads or Files, then choose <strong>Add Shortcut</strong>.</li><li>When asked for the setup code, paste it. When asked for a device, choose <strong>this iPhone’s name</strong>, never All Devices.</li><li>Run <strong>Daily Screen Time</strong> once. Allow Screen Time access and sending app activity to <code>family-screen-time-collector.feschetx-family-time.workers.dev</code> if prompted.</li></ol>
+<p>Then tell the setup chat <strong>“first run done”</strong>. It will check delivery directly. If the phone shows an error, give that message; you do not need to copy usage data.</p></section>
+<section><h2>2. Make it automatic</h2>
+<p>After the first run is confirmed:</p>
+<ol><li>Open <strong>Shortcuts → Automation → + → Time of Day</strong>.</li><li>Choose <strong>07:45</strong>, <strong>Daily</strong>, and <strong>Run Immediately</strong>.</li><li>Choose <strong>Daily Screen Time</strong>. If the screen asks for actions instead, add <strong>Run Shortcut</strong> and select it. Save.</li></ol>
+<p>Keep the phone on Hong Kong time. This runs before the 08:30 report. The setup chat still needs to verify a scheduled run while the phone is locked; installing the shortcut alone does not verify that.</p></section>
+<section><h2>What this covers</h2><p>App activity only. It does not read messages, photos, browser URLs or video titles, and it does not change limits, blocking or accounts. Apple’s figures remain separate from Qustodio’s; neither is independently verified attention. Empty or failed readings are unavailable data, not zero use.</p><small>Your setup code can upload only; it cannot download reports. Keep this private link and code private. This generic page does not upload your code or contain usage records. Version 1.</small></section>
+<script type="module" src="screen-time-install.mjs"></script></html>
