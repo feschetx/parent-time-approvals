@@ -11,6 +11,11 @@
 <a class="button" href="Daily-Screen-Time.shortcut" download>Download Daily Screen Time</a>
 <ol><li>Tap <strong>Copy private setup code</strong> above.</li><li>Download the shortcut. Open it from Safari Downloads or Files, then choose <strong>Add Shortcut</strong>.</li><li>When asked for the setup code, paste it. When asked for a device, choose <strong>this iPhone’s name</strong>, never All Devices.</li><li>Run <strong>Daily Screen Time</strong> once. Allow Screen Time access and sending app activity to <code>family-screen-time-collector.feschetx-family-time.workers.dev</code> if prompted.</li></ol>
 <p>Then tell the setup chat <strong>“first run done”</strong>. It will check delivery directly. If the phone shows an error, give that message; you do not need to copy usage data.</p></section>
+<section><h2>Check the installed copy</h2>
+<p>The shortcut may appear as <strong>Daily-Screen-Time</strong>. If importing did not ask for your code, edit the shortcut and replace <strong>PASTE-PRIVATE-SETUP-CODE</strong> in its first Text action with the code copied above.</p>
+<p>The current download needs two corrections before its first run:</p>
+<ol><li>Expand <strong>Format Date</strong>. Choose <strong>ISO 8601</strong> as the Date Format and enable <strong>Include Time</strong>.</li><li>In <strong>Combine</strong>, tap <strong>Text List → Select Variable</strong> and choose <strong>Repeat Results</strong> below End Repeat.</li></ol>
+<p>In Get App &amp; Website Activity, confirm <strong>Yesterday</strong>, <strong>Apps</strong>, and the specific iPhone you intend to monitor. A date-format error does not by itself establish that the phone’s time zone is wrong. Do not change phone settings just to clear that error.</p></section>
 <section><h2>2. Make it automatic</h2>
 <p>After the first run is confirmed:</p>
 <ol><li>In Shortcuts, open <strong>Daily Screen Time → Edit → Automation → Time of Day</strong>.</li><li>Choose <strong>07:45</strong> and <strong>Daily</strong>. Enable the automation and choose to run without asking (turn off <strong>Confirm Before Run</strong>, or choose <strong>Run Immediately</strong>, if shown).</li><li>In the shortcut editor, tap <strong>ⓘ → Privacy</strong> and enable <strong>Allow Running When Locked</strong>. Save.</li></ol>
