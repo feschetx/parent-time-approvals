@@ -1,5 +1,6 @@
 const button=document.getElementById('copy');
 const status=document.getElementById('status');
+document.getElementById('phone-note').hidden=new URLSearchParams(location.search).get('phone')!=='mini';
 // URL fragments are not sent in HTTP requests. Never put this value in a URL,
 // request, log, persistent storage or the rendered DOM.
 const setup=location.hash.slice(1);
